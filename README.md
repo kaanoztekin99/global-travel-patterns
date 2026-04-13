@@ -120,8 +120,8 @@ The dashboard supports:
       </a>
     </td>
     <td align="center">
-      <a href="https://github.com/leo">
-        <img src="https://avatars.githubusercontent.com/leo" width="80" alt="Kevin Rasmusson"/><br />
+      <a href="https://github.com/LeonardoNNanci">
+        <img src="https://avatars.githubusercontent.com/LeonardoNNanci" width="80" alt="Leonardo Noia Nanci de Araujo Silva"/><br />
         <sub><b>Leonardo Noia Nanci de Araujo Silva</b></sub>
       </a>
     </td>
