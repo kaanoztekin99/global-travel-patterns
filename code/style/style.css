@@ -196,3 +196,9 @@ html, body {
   pointer-events: none;
   z-index: 1;
 }
+
+.pc-div {
+  flex: 1;
+  overflow: "auto";
+  height: 100%;
+}

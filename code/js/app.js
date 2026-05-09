@@ -25,6 +25,11 @@ function App() {
     }, 300);
     }, [mapMode, isMapFull]);
 
+  // create d3 parallel coordinates chart
+  React.useEffect(() => {
+    const pc = new ParallelCoordinates("mos-parallel-coordinates", []);
+  }, []);
+
   return (
     <div className="dashboard">
       <header className="topbar">
@@ -56,6 +61,8 @@ function App() {
             <option>South America</option>
             <option>Oceania</option>
           </select>
+
+          <div id="mos-parallel-coordinates" class="pc-div"></div>         
         </aside>
 
         <main className="main-content">
