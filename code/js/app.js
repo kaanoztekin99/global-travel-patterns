@@ -3,9 +3,11 @@ function App() {
   const [mapMode, setMapMode] = React.useState("2d");
   const [selectedRegion, setSelectedRegion] = React.useState("World");
   const [plotLevel, setPlotLevel] = React.useState("country");
-  const [showHeritageLocations, setShowHeritageLocations] = React.useState(false);
   const [selectedHeritageTypes, setSelectedHeritageTypes] = React.useState([]);
+  const [showDangerHeritageSites, setShowDangerHeritageSites] = React.useState(false);
+  const [countrySelectionMode, setCountrySelectionMode] = React.useState(false);
   const [showRecentArrivals, setShowRecentArrivals] = React.useState(true);
+  const [showRecordArrivals, setShowRecordArrivals] = React.useState(false);
   const [arrivalYearRange, setArrivalYearRange] = React.useState([1995, 2020]);
 
   React.useEffect(() => {
@@ -40,6 +42,12 @@ function App() {
       }
     }, 350);
   }, [selectedRegion, mapMode, isMapFull]);
+
+  React.useEffect(() => {
+    if (typeof window.setCountrySelectionMode === "function") {
+      window.setCountrySelectionMode(mapMode === "2d" && countrySelectionMode);
+    }
+  }, [countrySelectionMode, mapMode]);
 
   React.useEffect(() => {
     setTimeout(() => {
@@ -78,23 +86,6 @@ function App() {
     setMapMode("2d");
   };
 
-  const handleHeritageLocationChange = (event) => {
-    const isVisible = event.target.checked;
-    setShowHeritageLocations(isVisible);
-
-    if (!isVisible) {
-      setSelectedHeritageTypes([]);
-
-      if (typeof window.setHeritageCategoryFilter === "function") {
-        window.setHeritageCategoryFilter([]);
-      }
-    }
-
-    if (typeof window.setHeritageLocationsVisible === "function") {
-      window.setHeritageLocationsVisible(isVisible);
-    }
-  };
-
   const handleHeritageTypeChange = (event) => {
     const type = event.target.value;
     const isChecked = event.target.checked;
@@ -109,13 +100,35 @@ function App() {
     }
   };
 
-  const updateArrivalFilter = (nextShowRecent, nextRange) => {
+  const handleDangerHeritageChange = (event) => {
+    const isChecked = event.target.checked;
+    setShowDangerHeritageSites(isChecked);
+
+    if (typeof window.setDangerHeritageFilter === "function") {
+      window.setDangerHeritageFilter(isChecked);
+    }
+  };
+
+  const handleCountrySelectionModeChange = () => {
+    setCountrySelectionMode((isActive) => !isActive);
+    setMapMode("2d");
+  };
+
+  const handleClearCountrySelection = () => {
+    if (typeof window.clearSelectedCountries === "function") {
+      window.clearSelectedCountries();
+    }
+  };
+
+  const updateArrivalFilter = (nextShowRecent, nextShowRecord, nextRange) => {
     setShowRecentArrivals(nextShowRecent);
+    setShowRecordArrivals(nextShowRecord);
     setArrivalYearRange(nextRange);
 
     if (typeof window.setArrivalYearFilter === "function") {
       window.setArrivalYearFilter({
         showRecent: nextShowRecent,
+        showRecord: nextShowRecord,
         startYear: nextRange[0],
         endYear: nextRange[1]
       });
@@ -124,7 +137,12 @@ function App() {
 
   const handleShowRecentArrivalsChange = (event) => {
     const isChecked = event.target.checked;
-    updateArrivalFilter(isChecked, isChecked ? [1995, 2020] : arrivalYearRange);
+    updateArrivalFilter(isChecked, false, isChecked ? [1995, 2020] : arrivalYearRange);
+  };
+
+  const handleShowRecordArrivalsChange = (event) => {
+    const isChecked = event.target.checked;
+    updateArrivalFilter(false, isChecked, isChecked ? [1995, 2020] : arrivalYearRange);
   };
 
   const handleArrivalYearRangeChange = (index, value) => {
@@ -137,7 +155,7 @@ function App() {
       nextRange[1 - index] = year;
     }
 
-    updateArrivalFilter(false, nextRange);
+    updateArrivalFilter(false, false, nextRange);
   };
 
   React.useEffect(() => {
@@ -225,23 +243,14 @@ function App() {
           </div>
 
           <div className="toggle-filter">
-            <span className="filter-label">Show Heritage Location</span>
-
-            <label className="toggle-switch heritage-toggle">
-              <input
-                type="checkbox"
-                checked={showHeritageLocations}
-                onChange={handleHeritageLocationChange}
-              />
-              <span className="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div className="toggle-filter">
             <span className="filter-label">Danger Zone</span>
 
             <label className="toggle-switch">
-              <input type="checkbox" />
+              <input
+                type="checkbox"
+                checked={showDangerHeritageSites}
+                onChange={handleDangerHeritageChange}
+              />
               <span className="toggle-slider"></span>
             </label>
           </div>
@@ -277,20 +286,59 @@ function App() {
                     className={mapMode === "3d" ? "viz-visible" : "viz-hidden"}
                 ></div>
 
+                <button
+                  className={countrySelectionMode ? "map-selection-btn active" : "map-selection-btn"}
+                  onClick={handleCountrySelectionModeChange}
+                  aria-label={countrySelectionMode ? "Disable country selection" : "Enable country selection"}
+                  title={countrySelectionMode ? "Disable country selection" : "Enable country selection"}
+                >
+                  <svg
+                    className="map-selection-icon"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 3L18 14L12.6 15.1L15.8 21L12.9 22.5L9.8 16.6L5 20V3Z" />
+                  </svg>
+                </button>
+
+                <button
+                  className="map-clear-selection-btn"
+                  onClick={handleClearCountrySelection}
+                  aria-label="Clear country selection"
+                  title="Clear country selection"
+                >
+                  <svg
+                    className="map-clear-selection-icon"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 4H16L17 6H21V8H19.6L18.5 21H5.5L4.4 8H3V6H7L8 4ZM6.4 8L7.3 19H16.7L17.6 8H6.4ZM9 10H11V17H9V10ZM13 10H15V17H13V10Z" />
+                  </svg>
+                </button>
+
                 <div className="arrival-filter-panel">
                   <div className="arrival-filter-icon" aria-hidden="true">⚙</div>
 
                   <div className="arrival-filter-content">
-                    <label className="arrival-recent-option">
-                      <input
-                        type="checkbox"
-                        checked={showRecentArrivals}
-                        onChange={handleShowRecentArrivalsChange}
-                      />
-                      Show Recent
-                    </label>
+	                    <label className="arrival-recent-option">
+	                      <input
+	                        type="checkbox"
+	                        checked={showRecentArrivals}
+	                        onChange={handleShowRecentArrivalsChange}
+	                      />
+	                      Show Recent
+	                    </label>
 
-                    <div className="arrival-range-header">
+	                    <label className="arrival-recent-option">
+	                      <input
+	                        type="checkbox"
+	                        checked={showRecordArrivals}
+	                        onChange={handleShowRecordArrivalsChange}
+	                      />
+	                      Show Record
+	                    </label>
+
+	                    <div className="arrival-range-header">
                       <span>Years Range</span>
                       <strong>{arrivalYearRange[0]} - {arrivalYearRange[1]}</strong>
                     </div>

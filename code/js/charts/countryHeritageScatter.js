@@ -104,17 +104,17 @@ async function initCountryHeritageScatter() {
       },
       scales: {
         x: {
-          title: {
-            display: true,
-            text: "Number of heritage sites"
-          },
-          ticks: {
-            precision: 0
-          },
-          grid: {
-            color: "rgba(148, 163, 184, 0.2)"
-          }
+        min: 0,
+        max: 60,
+        title: {
+          display: true,
+          text: "Number of heritage sites"
         },
+        ticks: {
+          stepSize: 10,
+          precision: 0
+        }
+      },
         y: {
           title: {
             display: true,

@@ -56,18 +56,13 @@ function focusMapRegion(regionName) {
 
 window.focusMapRegion = focusMapRegion;
 
-const heritageLayerIds = [
-  "heritage-clusters",
-  "heritage-cluster-count",
-  "heritage-sites-symbol"
-];
-
 function getFilteredHeritageGeojson() {
   const heritageGeojson = window.heritageGeojson || {
     type: "FeatureCollection",
     features: []
   };
   const selectedTypes = window.selectedHeritageTypes || [];
+  const includeDangerSites = window.includeDangerHeritageSites || false;
 
   if (!selectedTypes.length) {
     return {
@@ -79,7 +74,8 @@ function getFilteredHeritageGeojson() {
   return {
     type: "FeatureCollection",
     features: heritageGeojson.features.filter((feature) =>
-      selectedTypes.includes(feature.properties.category)
+      selectedTypes.includes(feature.properties.category) &&
+      (includeDangerSites || feature.properties.danger === "0")
     )
   };
 }
@@ -93,33 +89,26 @@ function updateHeritageSourceData() {
   }
 }
 
-function setHeritageLocationsVisible(isVisible) {
-  window.showHeritageLocations = isVisible;
-
-  const map = window.dashboardMap;
-  if (!map) return;
-
-  const visibility = isVisible ? "visible" : "none";
-
-  heritageLayerIds.forEach((layerId) => {
-    if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, "visibility", visibility);
-    }
-  });
-}
-
 function setHeritageCategoryFilter(selectedTypes) {
   window.selectedHeritageTypes = selectedTypes;
   updateHeritageSourceData();
 }
 
-window.showHeritageLocations = false;
+function setDangerHeritageFilter(includeDangerSites) {
+  window.includeDangerHeritageSites = includeDangerSites;
+  updateHeritageSourceData();
+}
+
 window.selectedHeritageTypes = [];
-window.setHeritageLocationsVisible = setHeritageLocationsVisible;
 window.setHeritageCategoryFilter = setHeritageCategoryFilter;
+window.includeDangerHeritageSites = false;
+window.setDangerHeritageFilter = setDangerHeritageFilter;
+window.countrySelectionMode = false;
+window.selectedCountryCodes = [];
 
 window.arrivalYearFilter = {
   showRecent: true,
+  showRecord: false,
   startYear: 1995,
   endYear: 2020
 };
@@ -129,6 +118,24 @@ function getArrivalForFilter(arrivalsData, filter) {
 
   const startYear = filter.showRecent ? 1995 : Math.min(filter.startYear, filter.endYear);
   const endYear = filter.showRecent ? 2020 : Math.max(filter.startYear, filter.endYear);
+  let recordArrival = null;
+
+  if (filter.showRecord) {
+    for (let year = 1995; year <= 2020; year++) {
+      const value = +arrivalsData[year.toString()];
+
+      if (!Number.isFinite(value) || value <= 0) continue;
+
+      if (!recordArrival || value > recordArrival.value) {
+        recordArrival = {
+          value,
+          year
+        };
+      }
+    }
+
+    return recordArrival;
+  }
 
   for (let year = endYear; year >= startYear; year--) {
     const value = +arrivalsData[year.toString()];
@@ -204,6 +211,72 @@ function setArrivalYearFilter(nextFilter) {
 
 window.setArrivalYearFilter = setArrivalYearFilter;
 
+function getSelectedCountriesFilter() {
+  return ["in", ["get", "cca2"], ["literal", window.selectedCountryCodes || []]];
+}
+
+function updateSelectedCountryLayers() {
+  const map = window.dashboardMap;
+  const filter = getSelectedCountriesFilter();
+
+  if (map?.getLayer("countries-selected-fill")) {
+    map.setFilter("countries-selected-fill", filter);
+  }
+
+  if (map?.getLayer("countries-selected-outline")) {
+    map.setFilter("countries-selected-outline", filter);
+  }
+}
+
+function addCountryCodesToSelection(countryCodes) {
+  const selectedCodes = new Set(window.selectedCountryCodes || []);
+
+  countryCodes.forEach((countryCode) => {
+    if (countryCode) {
+      selectedCodes.add(countryCode);
+    }
+  });
+
+  window.selectedCountryCodes = [...selectedCodes];
+  updateSelectedCountryLayers();
+}
+
+function toggleCountrySelection(countryCode) {
+  if (!countryCode) return;
+
+  const selectedCodes = window.selectedCountryCodes || [];
+  const isSelected = selectedCodes.includes(countryCode);
+
+  window.selectedCountryCodes = isSelected
+    ? selectedCodes.filter((code) => code !== countryCode)
+    : [...selectedCodes, countryCode];
+
+  updateSelectedCountryLayers();
+}
+
+function clearSelectedCountries() {
+  window.selectedCountryCodes = [];
+  updateSelectedCountryLayers();
+}
+
+function setCountrySelectionMode(isActive) {
+  window.countrySelectionMode = isActive;
+
+  const map = window.dashboardMap;
+  if (!map) return;
+
+  if (isActive) {
+    map.dragPan.disable();
+    map.getCanvas().style.cursor = "crosshair";
+  } else {
+    map.dragPan.enable();
+    map.getCanvas().style.cursor = "";
+  }
+}
+
+window.setCountrySelectionMode = setCountrySelectionMode;
+window.clearSelectedCountries = clearSelectedCountries;
+
 function createHeritagePinImage() {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
@@ -221,6 +294,32 @@ function createHeritagePinImage() {
   });
 }
 
+// Strip CSV-provided HTML so popup descriptions render as plain text.
+function getTextFromHtml(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html || "";
+
+  return (template.content.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Escape dynamic popup text before inserting it into HTML strings.
+function escapeHtml(value) {
+  const element = document.createElement("div");
+  element.textContent = value || "";
+
+  return element.innerHTML;
+}
+
+// Keep the initial heritage popup compact before the user expands it.
+function getTextExcerpt(text, maxLength = 160) {
+  if (!text) return "No description available.";
+  if (text.length <= maxLength) return text;
+
+  return `${text.slice(0, maxLength).trim()}...`;
+}
+
 function initMap() {
   if (window.dashboardMap) return;
 
@@ -229,7 +328,8 @@ function initMap() {
     style: "https://tiles.openfreemap.org/styles/liberty",
     center: [10, 25],
     zoom: 1.5,
-    maxZoom: 7
+    maxZoom: 7,
+    attributionControl: false
   });
 
   window.dashboardMap = map;
@@ -269,6 +369,7 @@ function initMap() {
             },
             properties: {
               name: site.name,
+              short_description: site.short_description,
               category: site.category,
               country: site.states_name,
               danger: site.danger
@@ -314,6 +415,17 @@ function initMap() {
       }
     });
 
+    map.addLayer({
+      id: "countries-selected-fill",
+      type: "fill",
+      source: "countries",
+      filter: getSelectedCountriesFilter(),
+      paint: {
+        "fill-color": "#facc15",
+        "fill-opacity": 0.36
+      }
+    });
+
     applyArrivalFilterToCountries();
 
     map.addLayer({
@@ -323,6 +435,24 @@ function initMap() {
       paint: {
         "line-color": "#555",
         "line-width": 0.7
+      }
+    });
+
+    map.addLayer({
+      id: "countries-selected-outline",
+      type: "line",
+      source: "countries",
+      filter: getSelectedCountriesFilter(),
+      paint: {
+        "line-color": "#111827",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          1, 1.8,
+          4, 3,
+          7, 5
+        ]
       }
     });
 
@@ -345,7 +475,7 @@ function initMap() {
       source: "heritage-sites",
       filter: ["has", "point_count"],
       layout: {
-        visibility: window.showHeritageLocations ? "visible" : "none"
+        visibility: "visible"
       },
       paint: {
         "circle-color": [
@@ -373,7 +503,7 @@ function initMap() {
       source: "heritage-sites",
       filter: ["has", "point_count"],
       layout: {
-        visibility: window.showHeritageLocations ? "visible" : "none",
+        visibility: "visible",
         "text-field": ["get", "point_count_abbreviated"],
         "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": 12
@@ -389,7 +519,7 @@ function initMap() {
       source: "heritage-sites",
       filter: ["!", ["has", "point_count"]],
       layout: {
-        visibility: window.showHeritageLocations ? "visible" : "none",
+        visibility: "visible",
         "icon-image": "heritage-pin",
         "icon-size": [
           "interpolate",
@@ -405,12 +535,136 @@ function initMap() {
 
     const popup = new maplibregl.Popup({
       closeButton: false,
-      closeOnClick: false
+      closeOnClick: false,
+      className: "dashboard-map-popup"
+    });
+    let activeHeritagePopup = null;
+    let showFullHeritageDescription = false;
+
+    const renderHeritagePopup = () => {
+      if (!activeHeritagePopup) return;
+
+      const { props, coordinates } = activeHeritagePopup;
+      const fullDescription = getTextFromHtml(props.short_description);
+      const displayDescription = showFullHeritageDescription
+        ? fullDescription || "No description available."
+        : getTextExcerpt(fullDescription);
+      const isDangerous = props.danger === "1";
+      const dangerLabel = isDangerous ? "Danger" : "Safe";
+      const dangerClass = isDangerous ? " dangerous" : "";
+      const prompt = showFullHeritageDescription
+        ? ""
+        : '<div class="heritage-popup-prompt">Press M to read more</div>';
+
+      popup
+        .setLngLat(coordinates)
+        .setHTML(`
+          <div class="heritage-popup-title">${escapeHtml(props.name)}</div>
+          <div class="heritage-popup-meta">
+            <span>${escapeHtml(props.category)}</span>
+            <span>${escapeHtml(props.country)}</span>
+            <span class="heritage-popup-danger${dangerClass}">${dangerLabel}</span>
+          </div>
+          <div class="heritage-popup-description">${escapeHtml(displayDescription)}</div>
+          ${prompt}
+        `)
+        .addTo(map);
+    };
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() !== "m" || !activeHeritagePopup) return;
+
+      showFullHeritageDescription = true;
+      renderHeritagePopup();
+    });
+
+    let selectionStartPoint = null;
+    let selectionBox = null;
+    let hasDraggedSelectionBox = false;
+
+    const removeSelectionBox = () => {
+      if (selectionBox) {
+        selectionBox.remove();
+        selectionBox = null;
+      }
+    };
+
+    const updateSelectionBox = (currentPoint) => {
+      if (!selectionBox || !selectionStartPoint) return;
+
+      const minX = Math.min(selectionStartPoint.x, currentPoint.x);
+      const maxX = Math.max(selectionStartPoint.x, currentPoint.x);
+      const minY = Math.min(selectionStartPoint.y, currentPoint.y);
+      const maxY = Math.max(selectionStartPoint.y, currentPoint.y);
+
+      selectionBox.style.left = `${minX}px`;
+      selectionBox.style.top = `${minY}px`;
+      selectionBox.style.width = `${maxX - minX}px`;
+      selectionBox.style.height = `${maxY - minY}px`;
+    };
+
+    map.on("mousedown", (e) => {
+      if (!window.countrySelectionMode || e.originalEvent.button !== 0) return;
+
+      e.preventDefault();
+      popup.remove();
+      selectionStartPoint = e.point;
+      hasDraggedSelectionBox = false;
+      map.getCanvas().style.cursor = "crosshair";
+
+      removeSelectionBox();
+      selectionBox = document.createElement("div");
+      selectionBox.className = "country-selection-box";
+      map.getContainer().appendChild(selectionBox);
+      updateSelectionBox(e.point);
+    });
+
+    map.on("mousemove", (e) => {
+      if (!selectionStartPoint) return;
+
+      const distanceX = Math.abs(e.point.x - selectionStartPoint.x);
+      const distanceY = Math.abs(e.point.y - selectionStartPoint.y);
+
+      if (distanceX > 4 || distanceY > 4) {
+        hasDraggedSelectionBox = true;
+      }
+
+      updateSelectionBox(e.point);
+    });
+
+    map.on("mouseup", (e) => {
+      if (!selectionStartPoint) return;
+
+      const startPoint = selectionStartPoint;
+      const endPoint = e.point;
+
+      selectionStartPoint = null;
+      removeSelectionBox();
+
+      if (!hasDraggedSelectionBox) return;
+
+      window.suppressNextCountryClickSelection = true;
+      window.setTimeout(() => {
+        window.suppressNextCountryClickSelection = false;
+      }, 100);
+
+      const bounds = [
+        [Math.min(startPoint.x, endPoint.x), Math.min(startPoint.y, endPoint.y)],
+        [Math.max(startPoint.x, endPoint.x), Math.max(startPoint.y, endPoint.y)]
+      ];
+      const features = map.queryRenderedFeatures(bounds, {
+        layers: ["countries-fill"]
+      });
+      const countryCodes = features.map((feature) => feature.properties.cca2);
+
+      addCountryCodesToSelection(countryCodes);
     });
 
     map.on("mousemove", "countries-fill", (e) => {
+      if (selectionStartPoint) return;
+
       const props = e.features[0].properties;
-      map.getCanvas().style.cursor = "pointer";
+      map.getCanvas().style.cursor = window.countrySelectionMode ? "crosshair" : "pointer";
 
       popup
         .setLngLat(e.lngLat)
@@ -423,11 +677,24 @@ function initMap() {
     });
 
     map.on("mouseleave", "countries-fill", () => {
-      map.getCanvas().style.cursor = "";
+      map.getCanvas().style.cursor = window.countrySelectionMode ? "crosshair" : "";
       popup.remove();
     });
 
+    map.on("click", "countries-fill", (e) => {
+      if (!window.countrySelectionMode) return;
+
+      if (window.suppressNextCountryClickSelection) {
+        window.suppressNextCountryClickSelection = false;
+        return;
+      }
+
+      toggleCountrySelection(e.features[0].properties.cca2);
+    });
+
     map.on("click", "heritage-clusters", async (e) => {
+      if (window.countrySelectionMode) return;
+
       const features = map.queryRenderedFeatures(e.point, {
         layers: ["heritage-clusters"]
       });
@@ -464,19 +731,22 @@ function initMap() {
     map.on("mousemove", "heritage-sites-symbol", (e) => {
       const props = e.features[0].properties;
       map.getCanvas().style.cursor = "pointer";
+      const coordinates = e.features[0].geometry.coordinates;
+      const isSameSite = activeHeritagePopup?.props.name === props.name;
 
-      popup
-        .setLngLat(e.features[0].geometry.coordinates)
-        .setHTML(`
-          <strong>${props.name}</strong><br>
-          Category: ${props.category}<br>
-          Country: ${props.country}
-        `)
-        .addTo(map);
+      activeHeritagePopup = { props, coordinates };
+
+      if (!isSameSite) {
+        showFullHeritageDescription = false;
+      }
+
+      renderHeritagePopup();
     });
 
     map.on("mouseleave", "heritage-sites-symbol", () => {
       map.getCanvas().style.cursor = "";
+      activeHeritagePopup = null;
+      showFullHeritageDescription = false;
       popup.remove();
     });
   });
