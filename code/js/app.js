@@ -3,8 +3,8 @@ function App() {
   const [mapMode, setMapMode] = React.useState("2d");
   const [selectedRegion, setSelectedRegion] = React.useState("World");
   const [plotLevel, setPlotLevel] = React.useState("country");
-  const [showHeritageLocations, setShowHeritageLocations] = React.useState(false);
   const [selectedHeritageTypes, setSelectedHeritageTypes] = React.useState([]);
+  const [countrySelectionMode, setCountrySelectionMode] = React.useState(false);
   const [showRecentArrivals, setShowRecentArrivals] = React.useState(true);
   const [arrivalYearRange, setArrivalYearRange] = React.useState([1995, 2020]);
 
@@ -40,6 +40,12 @@ function App() {
       }
     }, 350);
   }, [selectedRegion, mapMode, isMapFull]);
+
+  React.useEffect(() => {
+    if (typeof window.setCountrySelectionMode === "function") {
+      window.setCountrySelectionMode(mapMode === "2d" && countrySelectionMode);
+    }
+  }, [countrySelectionMode, mapMode]);
 
   React.useEffect(() => {
     setTimeout(() => {
@@ -78,23 +84,6 @@ function App() {
     setMapMode("2d");
   };
 
-  const handleHeritageLocationChange = (event) => {
-    const isVisible = event.target.checked;
-    setShowHeritageLocations(isVisible);
-
-    if (!isVisible) {
-      setSelectedHeritageTypes([]);
-
-      if (typeof window.setHeritageCategoryFilter === "function") {
-        window.setHeritageCategoryFilter([]);
-      }
-    }
-
-    if (typeof window.setHeritageLocationsVisible === "function") {
-      window.setHeritageLocationsVisible(isVisible);
-    }
-  };
-
   const handleHeritageTypeChange = (event) => {
     const type = event.target.value;
     const isChecked = event.target.checked;
@@ -106,6 +95,17 @@ function App() {
 
     if (typeof window.setHeritageCategoryFilter === "function") {
       window.setHeritageCategoryFilter(nextTypes);
+    }
+  };
+
+  const handleCountrySelectionModeChange = () => {
+    setCountrySelectionMode((isActive) => !isActive);
+    setMapMode("2d");
+  };
+
+  const handleClearCountrySelection = () => {
+    if (typeof window.clearSelectedCountries === "function") {
+      window.clearSelectedCountries();
     }
   };
 
@@ -217,19 +217,6 @@ function App() {
           </div>
 
           <div className="toggle-filter">
-            <span className="filter-label">Show Heritage Location</span>
-
-            <label className="toggle-switch heritage-toggle">
-              <input
-                type="checkbox"
-                checked={showHeritageLocations}
-                onChange={handleHeritageLocationChange}
-              />
-              <span className="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div className="toggle-filter">
             <span className="filter-label">Danger Zone</span>
 
             <label className="toggle-switch">
@@ -268,6 +255,36 @@ function App() {
                     id="globe"
                     className={mapMode === "3d" ? "viz-visible" : "viz-hidden"}
                 ></div>
+
+                <button
+                  className={countrySelectionMode ? "map-selection-btn active" : "map-selection-btn"}
+                  onClick={handleCountrySelectionModeChange}
+                  aria-label={countrySelectionMode ? "Disable country selection" : "Enable country selection"}
+                  title={countrySelectionMode ? "Disable country selection" : "Enable country selection"}
+                >
+                  <svg
+                    className="map-selection-icon"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 3L18 14L12.6 15.1L15.8 21L12.9 22.5L9.8 16.6L5 20V3Z" />
+                  </svg>
+                </button>
+
+                <button
+                  className="map-clear-selection-btn"
+                  onClick={handleClearCountrySelection}
+                  aria-label="Clear country selection"
+                  title="Clear country selection"
+                >
+                  <svg
+                    className="map-clear-selection-icon"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 4H16L17 6H21V8H19.6L18.5 21H5.5L4.4 8H3V6H7L8 4ZM6.4 8L7.3 19H16.7L17.6 8H6.4ZM9 10H11V17H9V10ZM13 10H15V17H13V10Z" />
+                  </svg>
+                </button>
 
                 <div className="arrival-filter-panel">
                   <div className="arrival-filter-icon" aria-hidden="true">⚙</div>

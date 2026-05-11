@@ -56,12 +56,6 @@ function focusMapRegion(regionName) {
 
 window.focusMapRegion = focusMapRegion;
 
-const heritageLayerIds = [
-  "heritage-clusters",
-  "heritage-cluster-count",
-  "heritage-sites-symbol"
-];
-
 function getFilteredHeritageGeojson() {
   const heritageGeojson = window.heritageGeojson || {
     type: "FeatureCollection",
@@ -93,30 +87,15 @@ function updateHeritageSourceData() {
   }
 }
 
-function setHeritageLocationsVisible(isVisible) {
-  window.showHeritageLocations = isVisible;
-
-  const map = window.dashboardMap;
-  if (!map) return;
-
-  const visibility = isVisible ? "visible" : "none";
-
-  heritageLayerIds.forEach((layerId) => {
-    if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, "visibility", visibility);
-    }
-  });
-}
-
 function setHeritageCategoryFilter(selectedTypes) {
   window.selectedHeritageTypes = selectedTypes;
   updateHeritageSourceData();
 }
 
-window.showHeritageLocations = false;
 window.selectedHeritageTypes = [];
-window.setHeritageLocationsVisible = setHeritageLocationsVisible;
 window.setHeritageCategoryFilter = setHeritageCategoryFilter;
+window.countrySelectionMode = false;
+window.selectedCountryCodes = [];
 
 window.arrivalYearFilter = {
   showRecent: true,
@@ -204,6 +183,72 @@ function setArrivalYearFilter(nextFilter) {
 
 window.setArrivalYearFilter = setArrivalYearFilter;
 
+function getSelectedCountriesFilter() {
+  return ["in", ["get", "cca2"], ["literal", window.selectedCountryCodes || []]];
+}
+
+function updateSelectedCountryLayers() {
+  const map = window.dashboardMap;
+  const filter = getSelectedCountriesFilter();
+
+  if (map?.getLayer("countries-selected-fill")) {
+    map.setFilter("countries-selected-fill", filter);
+  }
+
+  if (map?.getLayer("countries-selected-outline")) {
+    map.setFilter("countries-selected-outline", filter);
+  }
+}
+
+function addCountryCodesToSelection(countryCodes) {
+  const selectedCodes = new Set(window.selectedCountryCodes || []);
+
+  countryCodes.forEach((countryCode) => {
+    if (countryCode) {
+      selectedCodes.add(countryCode);
+    }
+  });
+
+  window.selectedCountryCodes = [...selectedCodes];
+  updateSelectedCountryLayers();
+}
+
+function toggleCountrySelection(countryCode) {
+  if (!countryCode) return;
+
+  const selectedCodes = window.selectedCountryCodes || [];
+  const isSelected = selectedCodes.includes(countryCode);
+
+  window.selectedCountryCodes = isSelected
+    ? selectedCodes.filter((code) => code !== countryCode)
+    : [...selectedCodes, countryCode];
+
+  updateSelectedCountryLayers();
+}
+
+function clearSelectedCountries() {
+  window.selectedCountryCodes = [];
+  updateSelectedCountryLayers();
+}
+
+function setCountrySelectionMode(isActive) {
+  window.countrySelectionMode = isActive;
+
+  const map = window.dashboardMap;
+  if (!map) return;
+
+  if (isActive) {
+    map.dragPan.disable();
+    map.getCanvas().style.cursor = "crosshair";
+  } else {
+    map.dragPan.enable();
+    map.getCanvas().style.cursor = "";
+  }
+}
+
+window.setCountrySelectionMode = setCountrySelectionMode;
+window.clearSelectedCountries = clearSelectedCountries;
+
 function createHeritagePinImage() {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
@@ -229,7 +274,8 @@ function initMap() {
     style: "https://tiles.openfreemap.org/styles/liberty",
     center: [10, 25],
     zoom: 1.5,
-    maxZoom: 7
+    maxZoom: 7,
+    attributionControl: false
   });
 
   window.dashboardMap = map;
@@ -314,6 +360,17 @@ function initMap() {
       }
     });
 
+    map.addLayer({
+      id: "countries-selected-fill",
+      type: "fill",
+      source: "countries",
+      filter: getSelectedCountriesFilter(),
+      paint: {
+        "fill-color": "#facc15",
+        "fill-opacity": 0.36
+      }
+    });
+
     applyArrivalFilterToCountries();
 
     map.addLayer({
@@ -323,6 +380,24 @@ function initMap() {
       paint: {
         "line-color": "#555",
         "line-width": 0.7
+      }
+    });
+
+    map.addLayer({
+      id: "countries-selected-outline",
+      type: "line",
+      source: "countries",
+      filter: getSelectedCountriesFilter(),
+      paint: {
+        "line-color": "#111827",
+        "line-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          1, 1.8,
+          4, 3,
+          7, 5
+        ]
       }
     });
 
@@ -345,7 +420,7 @@ function initMap() {
       source: "heritage-sites",
       filter: ["has", "point_count"],
       layout: {
-        visibility: window.showHeritageLocations ? "visible" : "none"
+        visibility: "visible"
       },
       paint: {
         "circle-color": [
@@ -373,7 +448,7 @@ function initMap() {
       source: "heritage-sites",
       filter: ["has", "point_count"],
       layout: {
-        visibility: window.showHeritageLocations ? "visible" : "none",
+        visibility: "visible",
         "text-field": ["get", "point_count_abbreviated"],
         "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": 12
@@ -389,7 +464,7 @@ function initMap() {
       source: "heritage-sites",
       filter: ["!", ["has", "point_count"]],
       layout: {
-        visibility: window.showHeritageLocations ? "visible" : "none",
+        visibility: "visible",
         "icon-image": "heritage-pin",
         "icon-size": [
           "interpolate",
@@ -408,9 +483,93 @@ function initMap() {
       closeOnClick: false
     });
 
+    let selectionStartPoint = null;
+    let selectionBox = null;
+    let hasDraggedSelectionBox = false;
+
+    const removeSelectionBox = () => {
+      if (selectionBox) {
+        selectionBox.remove();
+        selectionBox = null;
+      }
+    };
+
+    const updateSelectionBox = (currentPoint) => {
+      if (!selectionBox || !selectionStartPoint) return;
+
+      const minX = Math.min(selectionStartPoint.x, currentPoint.x);
+      const maxX = Math.max(selectionStartPoint.x, currentPoint.x);
+      const minY = Math.min(selectionStartPoint.y, currentPoint.y);
+      const maxY = Math.max(selectionStartPoint.y, currentPoint.y);
+
+      selectionBox.style.left = `${minX}px`;
+      selectionBox.style.top = `${minY}px`;
+      selectionBox.style.width = `${maxX - minX}px`;
+      selectionBox.style.height = `${maxY - minY}px`;
+    };
+
+    map.on("mousedown", (e) => {
+      if (!window.countrySelectionMode || e.originalEvent.button !== 0) return;
+
+      e.preventDefault();
+      popup.remove();
+      selectionStartPoint = e.point;
+      hasDraggedSelectionBox = false;
+      map.getCanvas().style.cursor = "crosshair";
+
+      removeSelectionBox();
+      selectionBox = document.createElement("div");
+      selectionBox.className = "country-selection-box";
+      map.getContainer().appendChild(selectionBox);
+      updateSelectionBox(e.point);
+    });
+
+    map.on("mousemove", (e) => {
+      if (!selectionStartPoint) return;
+
+      const distanceX = Math.abs(e.point.x - selectionStartPoint.x);
+      const distanceY = Math.abs(e.point.y - selectionStartPoint.y);
+
+      if (distanceX > 4 || distanceY > 4) {
+        hasDraggedSelectionBox = true;
+      }
+
+      updateSelectionBox(e.point);
+    });
+
+    map.on("mouseup", (e) => {
+      if (!selectionStartPoint) return;
+
+      const startPoint = selectionStartPoint;
+      const endPoint = e.point;
+
+      selectionStartPoint = null;
+      removeSelectionBox();
+
+      if (!hasDraggedSelectionBox) return;
+
+      window.suppressNextCountryClickSelection = true;
+      window.setTimeout(() => {
+        window.suppressNextCountryClickSelection = false;
+      }, 100);
+
+      const bounds = [
+        [Math.min(startPoint.x, endPoint.x), Math.min(startPoint.y, endPoint.y)],
+        [Math.max(startPoint.x, endPoint.x), Math.max(startPoint.y, endPoint.y)]
+      ];
+      const features = map.queryRenderedFeatures(bounds, {
+        layers: ["countries-fill"]
+      });
+      const countryCodes = features.map((feature) => feature.properties.cca2);
+
+      addCountryCodesToSelection(countryCodes);
+    });
+
     map.on("mousemove", "countries-fill", (e) => {
+      if (selectionStartPoint) return;
+
       const props = e.features[0].properties;
-      map.getCanvas().style.cursor = "pointer";
+      map.getCanvas().style.cursor = window.countrySelectionMode ? "crosshair" : "pointer";
 
       popup
         .setLngLat(e.lngLat)
@@ -423,11 +582,24 @@ function initMap() {
     });
 
     map.on("mouseleave", "countries-fill", () => {
-      map.getCanvas().style.cursor = "";
+      map.getCanvas().style.cursor = window.countrySelectionMode ? "crosshair" : "";
       popup.remove();
     });
 
+    map.on("click", "countries-fill", (e) => {
+      if (!window.countrySelectionMode) return;
+
+      if (window.suppressNextCountryClickSelection) {
+        window.suppressNextCountryClickSelection = false;
+        return;
+      }
+
+      toggleCountrySelection(e.features[0].properties.cca2);
+    });
+
     map.on("click", "heritage-clusters", async (e) => {
+      if (window.countrySelectionMode) return;
+
       const features = map.queryRenderedFeatures(e.point, {
         layers: ["heritage-clusters"]
       });
