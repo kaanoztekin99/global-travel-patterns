@@ -18,9 +18,9 @@ function destroyCityLevelCharts() {
     window.cityTemperatureViolinChart = null;
   }
 
-  if (window.cityDurationBudgetStackedChart) {
-    window.cityDurationBudgetStackedChart.destroy();
-    window.cityDurationBudgetStackedChart = null;
+  // For D3 chart, remove the SVG and clear the current instance.
+  window.cityDurationBudgetStackedBar.clear();
+  if (window.interactionManager && window.interactionManager.cityDurationBudgetStacked) {
   }
 }
 

@@ -44,7 +44,7 @@ function App() {
   React.useEffect(() => {
     setTimeout(() => {
       if (plotLevel === "country") {
-        if (typeof window.destroyCityLevelCharts === "function") {
+        if (window.cityDurationBudgetStackedBar) {
           window.destroyCityLevelCharts();
         }
 
@@ -66,8 +66,8 @@ function App() {
           window.initCityTemperatureViolin();
         }
 
-        if (typeof window.initCityDurationBudgetStackedBar === "function") {
-          window.initCityDurationBudgetStackedBar();
+        if (window.cityDurationBudgetStackedBar) {
+          window.cityDurationBudgetStackedBar.initChart();
         }
       }
     }, 100);
@@ -140,9 +140,17 @@ function App() {
     updateArrivalFilter(false, nextRange);
   };
 
-  // create d3 parallel coordinates chart
   React.useEffect(() => {
-    const pc = new ParallelCoordinates("mos-parallel-coordinates", []);
+        const countryDataPromise = d3.csv("../data/clean/countries.csv");
+        const cityDataPromise = d3.csv("../data/clean/cities.csv");
+        const heritageDataPromise = d3.csv("../data/clean/heritage.csv");
+
+        Promise.all([countryDataPromise, cityDataPromise, heritageDataPromise])
+            .then(([countryData, cityData, heritageData]) => {
+                window.parallelCoordinates = new ParallelCoordinates("mos-parallel-coordinates", cityData);
+                window.cityDurationBudgetStackedBar = new CityDurationBudgetStackedBar("city-duration-budget-stacked", cityData);
+                window.interactionManager = new InteractionManager(window.parallelCoordinates, window.cityDurationBudgetStackedBar);
+            });
   }, []);
 
   return (
@@ -238,7 +246,7 @@ function App() {
             </label>
           </div>
 
-          <div id="mos-parallel-coordinates" class="pc-div"></div>
+          <div id="mos-parallel-coordinates" className="pc-div"></div>
         </aside>
 
         <main className="main-content">
@@ -348,8 +356,7 @@ function App() {
 
                 <div className="chart-card">
                   <h2>Duration Budget Mix</h2>
-                  <div className="chart-canvas-wrap">
-                    <canvas id="city-duration-budget-stacked"></canvas>
+                  <div id="city-duration-budget-stacked" className="chart-canvas-wrap">
                   </div>
                 </div>
               </React.Fragment>
