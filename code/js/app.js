@@ -7,6 +7,7 @@ function App() {
   const [showDangerHeritageSites, setShowDangerHeritageSites] = React.useState(false);
   const [countrySelectionMode, setCountrySelectionMode] = React.useState(false);
   const [showRecentArrivals, setShowRecentArrivals] = React.useState(true);
+  const [showRecordArrivals, setShowRecordArrivals] = React.useState(false);
   const [arrivalYearRange, setArrivalYearRange] = React.useState([1995, 2020]);
 
   React.useEffect(() => {
@@ -119,13 +120,15 @@ function App() {
     }
   };
 
-  const updateArrivalFilter = (nextShowRecent, nextRange) => {
+  const updateArrivalFilter = (nextShowRecent, nextShowRecord, nextRange) => {
     setShowRecentArrivals(nextShowRecent);
+    setShowRecordArrivals(nextShowRecord);
     setArrivalYearRange(nextRange);
 
     if (typeof window.setArrivalYearFilter === "function") {
       window.setArrivalYearFilter({
         showRecent: nextShowRecent,
+        showRecord: nextShowRecord,
         startYear: nextRange[0],
         endYear: nextRange[1]
       });
@@ -134,7 +137,12 @@ function App() {
 
   const handleShowRecentArrivalsChange = (event) => {
     const isChecked = event.target.checked;
-    updateArrivalFilter(isChecked, isChecked ? [1995, 2020] : arrivalYearRange);
+    updateArrivalFilter(isChecked, false, isChecked ? [1995, 2020] : arrivalYearRange);
+  };
+
+  const handleShowRecordArrivalsChange = (event) => {
+    const isChecked = event.target.checked;
+    updateArrivalFilter(false, isChecked, isChecked ? [1995, 2020] : arrivalYearRange);
   };
 
   const handleArrivalYearRangeChange = (index, value) => {
@@ -147,7 +155,7 @@ function App() {
       nextRange[1 - index] = year;
     }
 
-    updateArrivalFilter(false, nextRange);
+    updateArrivalFilter(false, false, nextRange);
   };
 
   // create d3 parallel coordinates chart
@@ -304,16 +312,25 @@ function App() {
                   <div className="arrival-filter-icon" aria-hidden="true">⚙</div>
 
                   <div className="arrival-filter-content">
-                    <label className="arrival-recent-option">
-                      <input
-                        type="checkbox"
-                        checked={showRecentArrivals}
-                        onChange={handleShowRecentArrivalsChange}
-                      />
-                      Show Recent
-                    </label>
+	                    <label className="arrival-recent-option">
+	                      <input
+	                        type="checkbox"
+	                        checked={showRecentArrivals}
+	                        onChange={handleShowRecentArrivalsChange}
+	                      />
+	                      Show Recent
+	                    </label>
 
-                    <div className="arrival-range-header">
+	                    <label className="arrival-recent-option">
+	                      <input
+	                        type="checkbox"
+	                        checked={showRecordArrivals}
+	                        onChange={handleShowRecordArrivalsChange}
+	                      />
+	                      Show Record
+	                    </label>
+
+	                    <div className="arrival-range-header">
                       <span>Years Range</span>
                       <strong>{arrivalYearRange[0]} - {arrivalYearRange[1]}</strong>
                     </div>

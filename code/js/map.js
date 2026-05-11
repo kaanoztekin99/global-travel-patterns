@@ -108,6 +108,7 @@ window.selectedCountryCodes = [];
 
 window.arrivalYearFilter = {
   showRecent: true,
+  showRecord: false,
   startYear: 1995,
   endYear: 2020
 };
@@ -117,6 +118,24 @@ function getArrivalForFilter(arrivalsData, filter) {
 
   const startYear = filter.showRecent ? 1995 : Math.min(filter.startYear, filter.endYear);
   const endYear = filter.showRecent ? 2020 : Math.max(filter.startYear, filter.endYear);
+  let recordArrival = null;
+
+  if (filter.showRecord) {
+    for (let year = 1995; year <= 2020; year++) {
+      const value = +arrivalsData[year.toString()];
+
+      if (!Number.isFinite(value) || value <= 0) continue;
+
+      if (!recordArrival || value > recordArrival.value) {
+        recordArrival = {
+          value,
+          year
+        };
+      }
+    }
+
+    return recordArrival;
+  }
 
   for (let year = endYear; year >= startYear; year--) {
     const value = +arrivalsData[year.toString()];
