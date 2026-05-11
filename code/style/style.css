@@ -456,6 +456,64 @@ html, body {
   pointer-events: none;
 }
 
+.dashboard-map-popup .maplibregl-popup-content {
+  max-width: 300px;
+  padding: 12px 13px;
+  border: 1px solid rgba(250, 204, 21, 0.28);
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.94);
+  color: #f9fafb;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.28);
+}
+
+.dashboard-map-popup .maplibregl-popup-tip {
+  border-top-color: rgba(17, 24, 39, 0.64);
+  border-bottom-color: rgba(17, 24, 39, 0.64);
+}
+
+.heritage-popup-title {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.heritage-popup-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.heritage-popup-meta span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.14);
+  color: #fde68a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.heritage-popup-meta .heritage-popup-danger.dangerous {
+  background: rgba(220, 38, 38, 0.18);
+  color: #fecaca;
+}
+
+.heritage-popup-description {
+  max-width: 280px;
+  margin-top: 9px;
+  color: #d1d5db;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.heritage-popup-prompt {
+  margin-top: 8px;
+  color: #facc15;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .arrival-filter-panel {
   position: absolute;
   left: 14px;

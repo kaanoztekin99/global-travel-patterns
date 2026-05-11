@@ -4,6 +4,7 @@ function App() {
   const [selectedRegion, setSelectedRegion] = React.useState("World");
   const [plotLevel, setPlotLevel] = React.useState("country");
   const [selectedHeritageTypes, setSelectedHeritageTypes] = React.useState([]);
+  const [showDangerHeritageSites, setShowDangerHeritageSites] = React.useState(false);
   const [countrySelectionMode, setCountrySelectionMode] = React.useState(false);
   const [showRecentArrivals, setShowRecentArrivals] = React.useState(true);
   const [arrivalYearRange, setArrivalYearRange] = React.useState([1995, 2020]);
@@ -95,6 +96,15 @@ function App() {
 
     if (typeof window.setHeritageCategoryFilter === "function") {
       window.setHeritageCategoryFilter(nextTypes);
+    }
+  };
+
+  const handleDangerHeritageChange = (event) => {
+    const isChecked = event.target.checked;
+    setShowDangerHeritageSites(isChecked);
+
+    if (typeof window.setDangerHeritageFilter === "function") {
+      window.setDangerHeritageFilter(isChecked);
     }
   };
 
@@ -220,7 +230,11 @@ function App() {
             <span className="filter-label">Danger Zone</span>
 
             <label className="toggle-switch">
-              <input type="checkbox" />
+              <input
+                type="checkbox"
+                checked={showDangerHeritageSites}
+                onChange={handleDangerHeritageChange}
+              />
               <span className="toggle-slider"></span>
             </label>
           </div>

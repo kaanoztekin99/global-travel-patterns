@@ -62,6 +62,7 @@ function getFilteredHeritageGeojson() {
     features: []
   };
   const selectedTypes = window.selectedHeritageTypes || [];
+  const includeDangerSites = window.includeDangerHeritageSites || false;
 
   if (!selectedTypes.length) {
     return {
@@ -73,7 +74,8 @@ function getFilteredHeritageGeojson() {
   return {
     type: "FeatureCollection",
     features: heritageGeojson.features.filter((feature) =>
-      selectedTypes.includes(feature.properties.category)
+      selectedTypes.includes(feature.properties.category) &&
+      (includeDangerSites || feature.properties.danger === "0")
     )
   };
 }
@@ -92,8 +94,15 @@ function setHeritageCategoryFilter(selectedTypes) {
   updateHeritageSourceData();
 }
 
+function setDangerHeritageFilter(includeDangerSites) {
+  window.includeDangerHeritageSites = includeDangerSites;
+  updateHeritageSourceData();
+}
+
 window.selectedHeritageTypes = [];
 window.setHeritageCategoryFilter = setHeritageCategoryFilter;
+window.includeDangerHeritageSites = false;
+window.setDangerHeritageFilter = setDangerHeritageFilter;
 window.countrySelectionMode = false;
 window.selectedCountryCodes = [];
 
@@ -266,6 +275,32 @@ function createHeritagePinImage() {
   });
 }
 
+// Strip CSV-provided HTML so popup descriptions render as plain text.
+function getTextFromHtml(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html || "";
+
+  return (template.content.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Escape dynamic popup text before inserting it into HTML strings.
+function escapeHtml(value) {
+  const element = document.createElement("div");
+  element.textContent = value || "";
+
+  return element.innerHTML;
+}
+
+// Keep the initial heritage popup compact before the user expands it.
+function getTextExcerpt(text, maxLength = 160) {
+  if (!text) return "No description available.";
+  if (text.length <= maxLength) return text;
+
+  return `${text.slice(0, maxLength).trim()}...`;
+}
+
 function initMap() {
   if (window.dashboardMap) return;
 
@@ -315,6 +350,7 @@ function initMap() {
             },
             properties: {
               name: site.name,
+              short_description: site.short_description,
               category: site.category,
               country: site.states_name,
               danger: site.danger
@@ -480,7 +516,47 @@ function initMap() {
 
     const popup = new maplibregl.Popup({
       closeButton: false,
-      closeOnClick: false
+      closeOnClick: false,
+      className: "dashboard-map-popup"
+    });
+    let activeHeritagePopup = null;
+    let showFullHeritageDescription = false;
+
+    const renderHeritagePopup = () => {
+      if (!activeHeritagePopup) return;
+
+      const { props, coordinates } = activeHeritagePopup;
+      const fullDescription = getTextFromHtml(props.short_description);
+      const displayDescription = showFullHeritageDescription
+        ? fullDescription || "No description available."
+        : getTextExcerpt(fullDescription);
+      const isDangerous = props.danger === "1";
+      const dangerLabel = isDangerous ? "Danger" : "Safe";
+      const dangerClass = isDangerous ? " dangerous" : "";
+      const prompt = showFullHeritageDescription
+        ? ""
+        : '<div class="heritage-popup-prompt">Press M to read more</div>';
+
+      popup
+        .setLngLat(coordinates)
+        .setHTML(`
+          <div class="heritage-popup-title">${escapeHtml(props.name)}</div>
+          <div class="heritage-popup-meta">
+            <span>${escapeHtml(props.category)}</span>
+            <span>${escapeHtml(props.country)}</span>
+            <span class="heritage-popup-danger${dangerClass}">${dangerLabel}</span>
+          </div>
+          <div class="heritage-popup-description">${escapeHtml(displayDescription)}</div>
+          ${prompt}
+        `)
+        .addTo(map);
+    };
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() !== "m" || !activeHeritagePopup) return;
+
+      showFullHeritageDescription = true;
+      renderHeritagePopup();
     });
 
     let selectionStartPoint = null;
@@ -636,19 +712,22 @@ function initMap() {
     map.on("mousemove", "heritage-sites-symbol", (e) => {
       const props = e.features[0].properties;
       map.getCanvas().style.cursor = "pointer";
+      const coordinates = e.features[0].geometry.coordinates;
+      const isSameSite = activeHeritagePopup?.props.name === props.name;
 
-      popup
-        .setLngLat(e.features[0].geometry.coordinates)
-        .setHTML(`
-          <strong>${props.name}</strong><br>
-          Category: ${props.category}<br>
-          Country: ${props.country}
-        `)
-        .addTo(map);
+      activeHeritagePopup = { props, coordinates };
+
+      if (!isSameSite) {
+        showFullHeritageDescription = false;
+      }
+
+      renderHeritagePopup();
     });
 
     map.on("mouseleave", "heritage-sites-symbol", () => {
       map.getCanvas().style.cursor = "";
+      activeHeritagePopup = null;
+      showFullHeritageDescription = false;
       popup.remove();
     });
   });
