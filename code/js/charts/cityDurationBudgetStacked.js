@@ -114,14 +114,9 @@ class CityDurationBudgetStackedBar {
     // Create tooltip
     this.tooltip = container
       .append("div")
-      .attr("class", "tooltip")
+      .attr("class", "tooltip city-duration-budget-tooltip")
       .style("position", "absolute")
-      .style("visibility", "hidden")
-      .style("background", "rgba(0, 0, 0, 0.7)")
-      .style("color", "white")
-      .style("padding", "5px")
-      .style("border-radius", "3px")
-      .style("font-size", "12px");
+      .style("visibility", "hidden");
 
     // Draw bars
     this.chart.selectAll("g.layer")
@@ -166,8 +161,11 @@ class CityDurationBudgetStackedBar {
   }
 
   handleMouseMove(event) {
-    this.tooltip.style("top", (event.pageY - 10) + "px")
-      .style("left", (event.pageX + 10) + "px");
+    window.chartUtils.positionTooltip(
+      event,
+      this.tooltip,
+      d3.select(`#${this.containerId}`).node()
+    );
   }
 
   handleMouseOut() {

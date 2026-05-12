@@ -36,6 +36,29 @@ const chartUtils = {
     } catch {
       return [];
     }
+  },
+
+  positionTooltip(event, tooltip, containerElement, offset = 12) {
+    const [pointerX, pointerY] = d3.pointer(event, containerElement);
+    const tooltipNode = tooltip.node();
+    const containerWidth = containerElement.clientWidth || 0;
+    const containerHeight = containerElement.clientHeight || 0;
+    const tooltipWidth = tooltipNode?.offsetWidth || 0;
+    const tooltipHeight = tooltipNode?.offsetHeight || 0;
+    let left = pointerX + offset;
+    let top = pointerY + offset;
+
+    if (left + tooltipWidth > containerWidth) {
+      left = pointerX - tooltipWidth - offset;
+    }
+
+    if (top + tooltipHeight > containerHeight) {
+      top = pointerY - tooltipHeight - offset;
+    }
+
+    tooltip
+      .style("left", `${Math.max(offset, left)}px`)
+      .style("top", `${Math.max(offset, top)}px`);
   }
 };
 

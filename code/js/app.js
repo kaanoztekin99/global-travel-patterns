@@ -50,12 +50,16 @@ function App() {
   }, [countrySelectionMode, mapMode]);
 
   React.useEffect(() => {
-    setTimeout(() => {
-      if (plotLevel === "country") {
-        if (window.cityDurationBudgetStackedBar) {
-          window.destroyCityLevelCharts();
-        }
+    if (typeof window.destroyCountryLevelCharts === "function") {
+      window.destroyCountryLevelCharts();
+    }
 
+    if (typeof window.destroyCityLevelCharts === "function") {
+      window.destroyCityLevelCharts();
+    }
+
+    const chartInitTimer = setTimeout(() => {
+      if (plotLevel === "country") {
         if (typeof window.initCountryHeritageScatter === "function") {
           window.initCountryHeritageScatter();
         }
@@ -66,10 +70,6 @@ function App() {
       }
 
       if (plotLevel === "city") {
-        if (typeof window.destroyCountryLevelCharts === "function") {
-          window.destroyCountryLevelCharts();
-        }
-
         if (typeof window.initCityTemperatureViolin === "function") {
           window.initCityTemperatureViolin();
         }
@@ -79,6 +79,8 @@ function App() {
         }
       }
     }, 100);
+
+    return () => window.clearTimeout(chartInitTimer);
   }, [plotLevel]);
 
   const handleRegionChange = (event) => {
@@ -381,25 +383,19 @@ function App() {
               <React.Fragment>
                 <div className="chart-card">
                   <h2>UNESCO Sites vs Visitors</h2>
-                  <div className="chart-canvas-wrap">
-                    <canvas id="country-heritage-scatter"></canvas>
-                  </div>
+                  <div id="country-heritage-scatter" className="chart-canvas-wrap"></div>
                 </div>
 
                 <div className="chart-card">
-                  <h2>Budget Level Distribution</h2>
-                  <div className="chart-canvas-wrap">
-                    <canvas id="budget-level-bar"></canvas>
-                  </div>
+                  <h2>Most Popular Places Budget Distribution</h2>
+                  <div id="budget-level-bar" className="chart-canvas-wrap"></div>
                 </div>
               </React.Fragment>
             ) : (
               <React.Fragment>
                 <div className="chart-card">
                   <h2>Temperature Distribution by City</h2>
-                  <div className="chart-canvas-wrap">
-                    <canvas id="city-temperature-violin"></canvas>
-                  </div>
+                  <div id="city-temperature-violin" className="chart-canvas-wrap"></div>
                 </div>
 
                 <div className="chart-card">

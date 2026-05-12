@@ -19,7 +19,10 @@ function destroyCityLevelCharts() {
   }
 
   // For D3 chart, remove the SVG and clear the current instance.
-  window.cityDurationBudgetStackedBar.clear();
+  if (window.cityDurationBudgetStackedBar) {
+    window.cityDurationBudgetStackedBar.clear();
+  }
+
   if (window.interactionManager && window.interactionManager.cityDurationBudgetStacked) {
   }
 }
