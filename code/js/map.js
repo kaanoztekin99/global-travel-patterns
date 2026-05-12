@@ -219,10 +219,6 @@ function updateSelectedCountryLayers() {
   const map = window.dashboardMap;
   const filter = getSelectedCountriesFilter();
 
-  if (map?.getLayer("countries-selected-fill")) {
-    map.setFilter("countries-selected-fill", filter);
-  }
-
   if (map?.getLayer("countries-selected-outline")) {
     map.setFilter("countries-selected-outline", filter);
   }
@@ -412,17 +408,6 @@ function initMap() {
       paint: {
         "fill-color": "#e5e7eb",
         "fill-opacity": 0.65
-      }
-    });
-
-    map.addLayer({
-      id: "countries-selected-fill",
-      type: "fill",
-      source: "countries",
-      filter: getSelectedCountriesFilter(),
-      paint: {
-        "fill-color": "#facc15",
-        "fill-opacity": 0.36
       }
     });
 
